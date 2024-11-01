@@ -1,0 +1,157 @@
+---
+title: "Lab 5.1"
+author: "Mineev Anatolii"
+date: "2024-10-28"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#### One-way ANOVA
+
+```{r}
+data = read.csv("../data/diet.csv",row.names=1)
+summary(data)
+```
+Обработка данных:
+```{r}
+colnames(data) <- c("gender", "age", "height", "initial.weight", 
+                    "diet.type", "final.weight")
+data$diet.type <- factor(c("A", "B", "C")[data$diet.type])
+data$gender <- factor(c("F", "M")[data$gender + 1])
+#Добавим новую колонку - Похудение
+data$weight.loss = data$initial.weight - data$final.weight
+summary(data)
+```
+
+```{r}
+#Проанализиуем есть ли различия по типам диет
+boxplot(weight.loss~diet.type,data=data,col="light gray",
+        ylab = "Weight loss (kg)", xlab = "Diet type")
+abline(h=0,col="green")
+```
+
+```{r}
+#проверим сбалансированные ли данные
+table(data$diet.type)
+```
+
+```{r}
+#График групповых средних
+library(gplots) #библиотека устанавлевается с помощью install.packages
+plotmeans(weight.loss ~ diet.type, data=data)
+
+```
+
+```{r}
+aggregate(data$weight.loss, by = list(data$diet.type), FUN=sd)
+```
+
+
+```{r}
+#Для подгонки ANOVA модели используем функцию aov, частный случай линейной модели lm
+#тест на межгрупповые различия
+fit <- aov(weight.loss ~ diet.type, data=data)
+summary(fit)
+
+```
+
+```{r}
+#попарные различия между средними значениями для всех групп
+TukeyHSD(fit)
+```
+
+```{r}
+#Tukey honest significant differences test)
+library(multcomp)
+par(mar=c(5,4,6,2))
+tuk <- glht(fit, linfct=mcp(diet.type="Tukey"))
+plot(cld(tuk, level=.05),col="lightgrey")
+```
+
+#### One-way ANOVA без выбросов
+
+Удалим выбросы (данные с z-score > 3):
+```{r}
+sko <- sd(data$weight.loss)
+d1 <- data$weight.loss
+
+d2 <- d1[d1 > 3.5 * sko]
+
+
+fixed.data <- data[data$weight.loss <= 3 * sko, ]
+
+boxplot(weight.loss~diet.type,data=fixed.data,col="light gray",
+        ylab = "Weight loss (kg)", xlab = "Diet type")
+abline(h=0,col="green")
+
+```
+
+```{r}
+#проверим сбалансированные ли данные
+table(fixed.data$diet.type)
+```
+
+```{r}
+#График групповых средних
+library(gplots) #библиотека устанавлевается с помощью install.packages
+plotmeans(weight.loss ~ diet.type, data=fixed.data)
+```
+
+```{r}
+aggregate(fixed.data$weight.loss, by = list(fixed.data$diet.type), FUN=sd)
+```
+
+```{r}
+#Для подгонки ANOVA модели используем функцию aov, частный случай линейной модели lm
+#тест на межгрупповые различия
+fit <- aov(weight.loss ~ diet.type, data=fixed.data)
+summary(fit)
+```
+В этот раз p-value меньше
+
+
+
+```{r}
+TukeyHSD(fit)
+```
+
+```{r}
+#Tukey honest significant differences test)
+library(multcomp)
+par(mar=c(5,4,6,2))
+tuk <- glht(fit, linfct=mcp(diet.type="Tukey"))
+plot(cld(tuk, level=.05),col="lightgrey")
+```
+
+#### Two-way ANOVA
+
+```{r}
+gender.data <- fixed.data[complete.cases(fixed.data), ]
+table(gender.data$gender, gender.data$diet.type)
+
+```
+
+```{r}
+library("ggpubr")
+ggboxplot(gender.data, x="diet.type", y="weight.loss", color="gender")
+```
+
+```{r}
+ggline(gender.data, x="diet.type", y="weight.loss", color="gender", add = c("mean_se"))
+```
+
+```{r}
+fit.gender <- aov(weight.loss ~ diet.type*gender, data=gender.data)
+summary(fit.gender)
+```
+
+#### ANCOVA
+
+```{r}
+fit.height <- aov(weight.loss ~ diet.type*gender*height, data=gender.data)
+summary(fit.height)
+```
+Рост не влияет на сброшенный вес
